@@ -9,7 +9,14 @@ dotenv.config();
 const app = express();
 
 // Middleware
-app.use(cors());
+// app.use(cors());
+app.use(cors({
+  origin: [
+    "http://localhost:5173", // local frontend
+    "https://your-vercel-app.vercel.app" // replace after deploy
+  ],
+  credentials: true
+}));
 app.use(express.json());
 
 // Connect to MongoDB
@@ -19,6 +26,13 @@ connectDB();
 app.use('/api/students', require('./routes/students'));
 app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/predict', require('./routes/predict'));
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({
+    success: false,
+    message: "Server Error"
+  });
+});
 
 // Health check
 app.get('/api/health', (req, res) => {
