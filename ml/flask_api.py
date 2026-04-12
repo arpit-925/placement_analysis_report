@@ -7,12 +7,13 @@ import os
 app = Flask(__name__)
 CORS(app)
 
-# ✅ Absolute path fix (IMPORTANT for Render)
+# ✅ Absolute path (important for Render)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODELS_DIR = os.path.join(BASE_DIR, "models")
 
 print("🔄 Loading ML models from:", MODELS_DIR)
 
+# ✅ Load models safely
 try:
     logistic_model = joblib.load(os.path.join(MODELS_DIR, 'logistic_regression.pkl'))
     random_forest_model = joblib.load(os.path.join(MODELS_DIR, 'random_forest.pkl'))
@@ -22,22 +23,53 @@ try:
     print("✅ Models loaded successfully!")
 except Exception as e:
     print("❌ Model loading failed:", e)
+    raise e  # 🔥 Stop server if models fail
 
+# Feature names
 FEATURE_NAMES = [
     'CGPA', 'DSA_Score', 'WebDev_Score', 'ML_Score',
     'Aptitude_Score', 'Communication_Score',
     'Internships', 'Projects', 'Hackathons'
 ]
 
+# ─────────────────────────────────────────────
+# Root route (for quick testing)
+# ─────────────────────────────────────────────
+@app.route('/', methods=['GET'])
+def home():
+    return jsonify({
+        "message": "ML API is running 🚀"
+    })
+
+# ─────────────────────────────────────────────
+# Health check
+# ─────────────────────────────────────────────
 @app.route('/health', methods=['GET'])
 def health():
-    return jsonify({'status': 'ok', 'service': 'ML API'})
+    return jsonify({
+        'status': 'ok',
+        'service': 'ML API'
+    })
 
+# ─────────────────────────────────────────────
+# Prediction API
+# ─────────────────────────────────────────────
 @app.route('/predict', methods=['POST'])
 def predict():
     try:
         data = request.get_json()
 
+        # ✅ Validate request
+        if not data:
+            return jsonify({"error": "No input data provided"}), 400
+
+        print("📥 Received input:", data)
+
+        # ✅ Ensure model loaded
+        if 'random_forest_model' not in globals():
+            return jsonify({"error": "Model not loaded"}), 500
+
+        # ✅ Extract features safely
         features = np.array([[
             float(data.get('cgpa', 0)),
             float(data.get('dsa', 0)),
@@ -50,9 +82,11 @@ def predict():
             int(data.get('hackathons', 0))
         ]])
 
+        # ✅ Scale features
         features_scaled_class = scaler_class.transform(features)
         features_scaled_salary = scaler_salary.transform(features)
 
+        # ✅ Prediction
         rf_prob = random_forest_model.predict_proba(features_scaled_class)[0][1]
         placement_prob = round(float(rf_prob) * 100, 2)
 
@@ -69,19 +103,28 @@ def predict():
         print("🔥 Prediction error:", e)
         return jsonify({"error": str(e)}), 500
 
+# ─────────────────────────────────────────────
+# Feature Importance
+# ─────────────────────────────────────────────
 @app.route('/feature-importance', methods=['GET'])
 def feature_importance():
     try:
         importances = random_forest_model.feature_importances_
+
         return jsonify({
             "feature_importance": [
-                {"feature": name, "importance": float(imp)}
+                {"feature": name, "importance": round(float(imp), 4)}
                 for name, imp in zip(FEATURE_NAMES, importances)
             ]
         })
+
     except Exception as e:
+        print("🔥 Feature importance error:", e)
         return jsonify({"error": str(e)}), 500
 
+# ─────────────────────────────────────────────
+# Run server
+# ─────────────────────────────────────────────
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)

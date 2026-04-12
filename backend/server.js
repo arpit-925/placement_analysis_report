@@ -7,26 +7,29 @@ dotenv.config();
 
 const app = express();
 
-// ✅ CORS FIX
+// ✅ CORS (FIXED - allow your real frontend OR all for now)
 app.use(cors({
   origin: [
     "http://localhost:5173",
-    "https://your-actual-vercel-url.vercel.app"
+    "https://placement-analysis-report.vercel.app" // 🔥 replace with your real URL
   ],
   credentials: true
 }));
 
+// 👉 TEMP (if still debugging, you can use this instead)
+// app.use(cors());
+
 app.use(express.json());
 
-// DB
+// ✅ Connect DB
 connectDB();
 
-// ✅ ROUTES FIX
+// ✅ ROUTES (CLEAN STRUCTURE)
 app.use('/api/students', require('./routes/students'));
 app.use('/api/analytics', require('./routes/analytics'));
-app.use('/api', require('./routes/predict')); // ✅ FIXED
+app.use('/api', require('./routes/predict')); // 🔥 important
 
-// Health
+// ✅ Health check
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
@@ -35,16 +38,30 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Root
+// ✅ Root route
 app.get('/', (req, res) => {
   res.json({
-    message: 'Placement API running'
+    message: 'Placement API running 🚀',
+    endpoints: {
+      students: '/api/students',
+      analytics: '/api/analytics',
+      predict: '/api/predict',
+      health: '/api/health'
+    }
   });
 });
 
-// Error handler
+// ❗ 404 handler (VERY IMPORTANT FOR DEBUGGING)
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: `Route not found: ${req.originalUrl}`
+  });
+});
+
+// ✅ Error handler
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  console.error("🔥 Server Error:", err.stack);
   res.status(500).json({
     success: false,
     message: "Server Error"

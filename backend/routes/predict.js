@@ -2,15 +2,19 @@ const express = require('express');
 const router = express.Router();
 const axios = require('axios');
 
-// ✅ Use environment variable ONLY (no localhost fallback in production)
+// ✅ Ensure env variable exists
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL;
 
-// ✅ Utility: validate numbers safely
+if (!ML_SERVICE_URL) {
+  console.error("❌ ML_SERVICE_URL is not defined in environment variables");
+}
+
+// ✅ Utility functions
 const toFloat = (val) => (val !== undefined ? parseFloat(val) : 0);
 const toInt = (val) => (val !== undefined ? parseInt(val) : 0);
 
-// POST /api/predict — Proxy prediction to Flask ML service
-router.post('/', async (req, res) => {
+// ✅ POST /api/predict
+router.post('/predict', async (req, res) => {
   try {
     const {
       cgpa,
@@ -45,16 +49,16 @@ router.post('/', async (req, res) => {
       hackathons: toInt(hackathons)
     };
 
+    console.log("📡 Sending request to ML:", `${ML_SERVICE_URL}/predict`);
+
     // ✅ Call ML service
     const mlResponse = await axios.post(
       `${ML_SERVICE_URL}/predict`,
       payload,
-      {
-        timeout: 15000
-      }
+      { timeout: 20000 }
     );
 
-    return res.status(200).json({
+    return res.json({
       success: true,
       data: mlResponse.data
     });
@@ -62,23 +66,20 @@ router.post('/', async (req, res) => {
   } catch (error) {
     console.error('🔥 Prediction Error:', error.message);
 
-    // ✅ Handle ML service down
     if (error.code === 'ECONNREFUSED') {
       return res.status(503).json({
         success: false,
-        error: 'ML service unavailable (connection refused)'
+        error: 'ML service unavailable'
       });
     }
 
-    // ✅ Handle timeout (Render cold start case)
     if (error.code === 'ECONNABORTED') {
       return res.status(504).json({
         success: false,
-        error: 'ML service timeout (cold start or slow response)'
+        error: 'ML service timeout'
       });
     }
 
-    // ✅ Forward ML error if exists
     if (error.response) {
       return res.status(error.response.status).json({
         success: false,
@@ -93,7 +94,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-// GET /api/predict/feature-importance
+// ✅ GET /api/feature-importance
 router.get('/feature-importance', async (req, res) => {
   try {
     const response = await axios.get(
@@ -108,13 +109,6 @@ router.get('/feature-importance', async (req, res) => {
 
   } catch (error) {
     console.error('🔥 Feature Importance Error:', error.message);
-
-    if (error.code === 'ECONNREFUSED') {
-      return res.status(503).json({
-        success: false,
-        error: 'ML service unavailable'
-      });
-    }
 
     return res.status(500).json({
       success: false,
