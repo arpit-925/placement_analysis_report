@@ -28,6 +28,7 @@ connectDB();
 app.use('/api/students', require('./routes/students'));
 app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api', require('./routes/predict')); // 🔥 important
+app.use('/api/teacher', require('./routes/upload')); // 📤 Teacher file upload
 
 // ✅ Health check
 app.get('/api/health', (req, res) => {
